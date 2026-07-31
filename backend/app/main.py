@@ -130,7 +130,18 @@ def create_application() -> FastAPI:
     app.include_router(upload.router, prefix=settings.api_prefix, tags=["Upload"])
     app.include_router(batch.router, prefix=settings.api_prefix, tags=["Batch"])
 
-    # ── Health check ──────────────────────────────────────────────────────────
+    # ── Root & Health check ───────────────────────────────────────────────────
+    @app.get("/", tags=["Root"])
+    async def root():
+        return {
+            "name": settings.app_name,
+            "status": "healthy",
+            "version": settings.app_version,
+            "docs": "/docs",
+            "health": "/health",
+            "api_prefix": settings.api_prefix,
+        }
+
     @app.get("/health", tags=["Health"])
     async def health_check():
         return {

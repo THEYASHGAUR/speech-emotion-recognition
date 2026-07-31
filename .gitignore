@@ -24,10 +24,13 @@ MANIFEST
 
 # ── Environments ─────────────────────────────────────────────────────────────
 .env
-.env.local
-.env.*.local
+.env*
 !.env.example
-!.env.local.example
+!.env*.example
+**/.env
+**/.env*
+!**/.env.example
+!**/.env*.example
 .venv
 .venv/
 venv
@@ -36,6 +39,7 @@ backend/.venv
 backend/.venv/
 backend/venv
 backend/venv/
+backend/.env
 **/.venv
 **/.venv/**
 env/
@@ -45,14 +49,22 @@ venv.bak/
 
 # ── Uploads & Downloaded Models ──────────────────────────────────────────────
 uploads/
+**/uploads/
+**/uploads/**
 backend/uploads/
 models/
+**/models/
+**/models/**
 backend/models/
 *.wav
 *.mp3
 *.ogg
 *.flac
 *.m4a
+*.aac
+*.webm
+*.opus
+*.zip
 
 # ── Node.js & Next.js ────────────────────────────────────────────────────────
 node_modules/

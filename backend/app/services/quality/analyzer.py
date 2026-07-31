@@ -127,8 +127,9 @@ class QualityAnalyzer:
         start = len(waveform) // 4
         segment = waveform[start : start + sr]  # 1 second segment
 
-        # Normalized autocorrelation
-        corr = np.correlate(segment, segment, mode="full")
+        import scipy.signal
+        # Fast FFT-based normalized autocorrelation
+        corr = scipy.signal.correlate(segment, segment, mode="full", method="fft")
         corr = corr[len(corr) // 2:]
         if corr[0] > 0:
             corr = corr / corr[0]

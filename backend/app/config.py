@@ -82,7 +82,7 @@ class Settings(BaseSettings):
 
     # ─────────────────────── Processing ──────────────────────────
     max_concurrent_files: int = Field(4, env="MAX_CONCURRENT_FILES")
-    processing_timeout_seconds: int = Field(120, env="PROCESSING_TIMEOUT_SECONDS")
+    processing_timeout_seconds: int = Field(300, env="PROCESSING_TIMEOUT_SECONDS")
 
     # ─────────────────────── HuggingFace ─────────────────────────
     huggingface_token: str = Field("", env="HUGGINGFACE_TOKEN")

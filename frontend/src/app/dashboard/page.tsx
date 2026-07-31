@@ -83,7 +83,7 @@ export default function DashboardPage() {
           <Link href="/upload">
             <button className="btn-primary" id="upload-new-btn">
               <Upload size={16} />
-              Upload Batch
+              Upload File
             </button>
           </Link>
         </div>

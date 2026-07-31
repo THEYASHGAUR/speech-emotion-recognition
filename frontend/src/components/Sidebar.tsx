@@ -13,7 +13,7 @@ import {
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/upload", icon: Upload, label: "Upload Batch" },
+  { href: "/upload", icon: Upload, label: "Upload File" },
   { href: "/history", icon: History, label: "History" },
 ];
 

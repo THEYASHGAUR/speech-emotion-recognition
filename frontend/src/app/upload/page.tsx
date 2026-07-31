@@ -131,7 +131,7 @@ export default function UploadPage() {
           {/* Header */}
           <div style={{ marginBottom: "32px" }}>
             <h1 style={{ fontSize: "26px", fontWeight: "700", letterSpacing: "-0.02em", marginBottom: "4px" }}>
-              Upload Batch
+              Upload File
             </h1>
             <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>
               Upload a ZIP archive or individual audio files for analysis

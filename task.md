@@ -166,7 +166,7 @@ Pages
 
 - Login
 - Dashboard
-- Upload Batch
+- Upload File
 - Results
 - History (optional)
 

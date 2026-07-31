@@ -96,10 +96,9 @@ class OverlapDetector:
         # overlap often causes less tonal structure → higher flatness
         flatness = librosa.feature.spectral_flatness(S=mag)[0]
 
-        # Harmonics-to-noise ratio proxy via harmonic/percussive separation
-        y_harm, y_perc = librosa.effects.hpss(waveform)
-        harm_energy = librosa.feature.rms(y=y_harm, frame_length=frame_length, hop_length=hop_length)[0]
-        perc_energy = librosa.feature.rms(y=y_perc, frame_length=frame_length, hop_length=hop_length)[0]
+        # Harmonics-to-noise ratio proxy directly from STFT magnitude matrix
+        harm_energy = np.mean(mag, axis=0)
+        perc_energy = np.std(mag, axis=0)
 
         min_len = min(len(voice_frames), len(flatness), len(harm_energy), len(perc_energy))
         voice_frames = voice_frames[:min_len]

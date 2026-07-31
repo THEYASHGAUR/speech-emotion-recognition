@@ -60,7 +60,17 @@ class AudioProcessor:
                 f"Unsupported format '{ext}'. Allowed: {', '.join(allowed)}"
             )
 
-        # Try librosa first (handles wav, mp3, flac, ogg, etc.)
+        # Try soundfile first (fast C library for wav, ogg, flac)
+        try:
+            waveform, sr = sf.read(str(file_path), dtype="float32")
+            if waveform.ndim > 1:
+                waveform = waveform.mean(axis=1)
+            logger.debug(f"Loaded {file_path.name} via soundfile: sr={sr}, duration={len(waveform)/sr:.2f}s")
+            return waveform, int(sr)
+        except Exception:
+            pass
+
+        # Fallback to librosa
         try:
             waveform, sr = librosa.load(
                 str(file_path),
@@ -68,7 +78,7 @@ class AudioProcessor:
                 mono=True,
             )
             logger.debug(f"Loaded {file_path.name}: sr={sr}, duration={len(waveform)/sr:.2f}s")
-            return waveform, sr
+            return waveform, int(sr)
         except Exception as e:
             logger.warning(f"librosa failed for {file_path.name}: {e}, trying ffmpeg...")
 

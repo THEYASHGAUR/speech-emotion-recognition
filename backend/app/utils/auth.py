@@ -8,7 +8,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-import bcrypt
+try:
+    import bcrypt
+except ImportError:
+    bcrypt = None
+
 from jose import JWTError, jwt
 
 from app.config import get_settings
@@ -21,11 +25,16 @@ ALGORITHM = "HS256"
 
 def hash_password(password: str) -> str:
     """Hash a plaintext password using bcrypt."""
+    if bcrypt is None:
+        raise RuntimeError("bcrypt package is not installed. Please install 'bcrypt'.")
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Verify a plaintext password against a bcrypt hash."""
+    if bcrypt is None:
+        logger.warning("bcrypt is not installed; password verification failed.")
+        return False
     try:
         return bcrypt.checkpw(plain.encode(), hashed.encode())
     except Exception:

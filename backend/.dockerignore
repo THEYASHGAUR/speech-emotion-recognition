@@ -1,0 +1,29 @@
+# Ignore Python virtual environment
+.venv/
+venv/
+env/
+
+# Ignore uploads and downloaded models
+uploads/
+models/
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.m4a
+
+# Ignore git and IDE files
+.git/
+.gitignore
+.dockerignore
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Ignore frontend & node modules
+node_modules/
+.next/

@@ -1,30 +1,28 @@
 # AutoAce AI Backend Dockerfile
-# Multi-stage build for minimal production image
+FROM python:3.11-slim
 
-FROM python:3.11-slim AS base
+# Prevent Python from writing .pyc files & buffer stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Install system dependencies including ffmpeg
+# Install system dependencies (ffmpeg & libsndfile1 for audio decoding)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
 WORKDIR /app
 
 # Copy and install Python dependencies first (layer caching)
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Copy application code
+# Copy application code & setup permissions
 COPY . .
+RUN mkdir -p /app/uploads /app/models/emotion && \
+    useradd -m -u 1000 autoace && \
+    chown -R autoace:autoace /app
 
-# Create directories
-RUN mkdir -p /app/uploads /app/models/emotion
-
-# Non-root user for security
-RUN useradd -m -u 1000 autoace && chown -R autoace:autoace /app
 USER autoace
 
 EXPOSE 8000

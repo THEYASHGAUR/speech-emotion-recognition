@@ -3,7 +3,7 @@ version: "3.9"
 services:
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: autoace-backend
     restart: unless-stopped
@@ -16,7 +16,7 @@ services:
       - AUTH_USERNAME=${AUTH_USERNAME:-admin}
       - AUTH_PASSWORD=${AUTH_PASSWORD:-autoace2024}
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - CORS_ORIGINS=["http://localhost:3000","http://frontend:3000"]
+      - CORS_ORIGINS=${CORS_ORIGINS:-["http://localhost:3000"]}
       - UPLOAD_DIR=/app/uploads
       - EMOTION_MODEL_CACHE_DIR=/app/models/emotion
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-}
@@ -30,23 +30,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: autoace-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-nextauth-secret}
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - INTERNAL_API_URL=http://backend:8000
-    depends_on:
-      backend:
-        condition: service_healthy
 
 volumes:
   uploads_data:

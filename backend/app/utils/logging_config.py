@@ -56,6 +56,10 @@ class _JSONFormatter(logging.Formatter):
 
 def configure_logging() -> None:
     """Configure root logger based on environment."""
+    import os
+    os.environ["TQDM_DISABLE"] = "1"
+    os.environ["DISABLE_TQDM"] = "1"
+
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG if settings.debug else logging.INFO)
 
@@ -72,5 +76,10 @@ def configure_logging() -> None:
     root_logger.addHandler(handler)
 
     # Quieten noisy third-party loggers
-    for noisy in ("urllib3", "httpx", "transformers", "torch"):
+    noisy_loggers = (
+        "urllib3", "httpx", "transformers", "torch", "numba",
+        "librosa", "soundfile", "asyncio", "uvicorn.access",
+        "uvicorn.error", "matplotlib", "PIL", "filelock", "huggingface_hub"
+    )
+    for noisy in noisy_loggers:
         logging.getLogger(noisy).setLevel(logging.WARNING)

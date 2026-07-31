@@ -28,7 +28,16 @@ MANIFEST
 .env.*.local
 !.env.example
 !.env.local.example
+.venv
+.venv/
+venv
 venv/
+backend/.venv
+backend/.venv/
+backend/venv
+backend/venv/
+**/.venv
+**/.venv/**
 env/
 ENV/
 env.bak/

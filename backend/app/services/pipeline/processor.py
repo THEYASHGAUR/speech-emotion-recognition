@@ -75,7 +75,7 @@ class PipelineProcessor:
         """
         logger.info(f"Batch {batch_id}: starting processing of {len(file_paths)} files")
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         max_workers = self.settings.max_concurrent_files
 
         batch_store[batch_id]["status"] = BatchStatus.processing
@@ -84,19 +84,18 @@ class PipelineProcessor:
         results: List[FileResult] = []
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_path = {
-                executor.submit(self._process_file_sync, fp): fp
+            tasks = [
+                (fp, loop.run_in_executor(executor, self._process_file_sync, fp))
                 for fp in file_paths
-            }
+            ]
 
-            for future in as_completed(
-                future_to_path,
-                timeout=self.settings.processing_timeout_seconds * len(file_paths),
-            ):
-                fp = future_to_path[future]
+            for fp, future in tasks:
                 try:
-                    result = future.result(timeout=self.settings.processing_timeout_seconds)
-                except TimeoutError:
+                    result = await asyncio.wait_for(
+                        future,
+                        timeout=float(self.settings.processing_timeout_seconds),
+                    )
+                except asyncio.TimeoutError:
                     logger.error(f"Processing timeout for {fp.name}")
                     result = FileResult(
                         filename=fp.name,

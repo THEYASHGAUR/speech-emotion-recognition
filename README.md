@@ -18,8 +18,17 @@
 ```bash
 cd backend
 cp .env.example .env        # Edit .env with your settings
+
+# Create & activate virtual environment
+python -m venv .venv
+
+# On Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# On Linux/macOS:
+# source .venv/bin/activate
+
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 ### 2. Frontend Setup

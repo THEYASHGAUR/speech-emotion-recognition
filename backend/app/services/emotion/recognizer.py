@@ -161,6 +161,11 @@ class EmotionRecognizer:
             return EmotionalTone.neutral, EmotionalIntensity.low, 0.3
 
         try:
+            # Cap waveform duration to max 30s for emotion model to avoid long inference/chunking
+            max_samples = sample_rate * 30
+            if len(waveform) > max_samples:
+                waveform = waveform[:max_samples]
+
             # HuggingFace pipeline accepts raw numpy arrays with sampling_rate
             results = self._pipeline(
                 {"raw": waveform, "sampling_rate": sample_rate},

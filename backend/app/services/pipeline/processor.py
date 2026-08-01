@@ -166,10 +166,12 @@ class PipelineProcessor:
         filename = file_path.name
 
         try:
-            logger.debug(f"Processing: {filename}")
+            logger.info(f"Processing: {filename}")
 
             # ── Step 1: Load + preprocess audio ──────────────────────────────
+            t0 = time.perf_counter()
             waveform, sr, duration = self.audio_processor.preprocess(file_path)
+            logger.info(f"  [{filename}] Step 1 — Load/preprocess: {time.perf_counter() - t0:.2f}s (duration={duration:.1f}s)")
 
             if self.audio_processor.is_silent(waveform, threshold_db=-70.0):
                 return FileResult(
@@ -179,6 +181,7 @@ class PipelineProcessor:
                 )
 
             # ── Step 2: Emotion recognition ───────────────────────────────────
+            t0 = time.perf_counter()
             tone, intensity, model_conf = (
                 self.emotion_recognizer.predict(waveform, sr)
                 if self.emotion_recognizer
@@ -188,20 +191,30 @@ class PipelineProcessor:
                     0.3,
                 )
             )
+            logger.info(f"  [{filename}] Step 2 — Emotion: {time.perf_counter() - t0:.2f}s")
 
             # ── Step 3: Noise detection ───────────────────────────────────────
+            t0 = time.perf_counter()
             noise_result = self.noise_detector.analyze(waveform, sr)
+            logger.info(f"  [{filename}] Step 3 — Noise: {time.perf_counter() - t0:.2f}s")
 
             # ── Step 4: Quality analysis ──────────────────────────────────────
+            t0 = time.perf_counter()
             quality, quality_features = self.quality_analyzer.analyze(waveform, sr)
+            logger.info(f"  [{filename}] Step 4 — Quality: {time.perf_counter() - t0:.2f}s")
 
             # ── Step 5: Silence detection ─────────────────────────────────────
+            t0 = time.perf_counter()
             silence_result = self.silence_detector.analyze(waveform, sr)
+            logger.info(f"  [{filename}] Step 5 — Silence: {time.perf_counter() - t0:.2f}s")
 
             # ── Step 6: Overlap detection ─────────────────────────────────────
+            t0 = time.perf_counter()
             overlap_result = self.overlap_detector.analyze(waveform, sr)
+            logger.info(f"  [{filename}] Step 6 — Overlap: {time.perf_counter() - t0:.2f}s")
 
             # ── Step 7: Confidence score ──────────────────────────────────────
+            t0 = time.perf_counter()
             confidence = self.confidence_calculator.compute(
                 model_confidence=model_conf,
                 audio_duration_seconds=duration,
@@ -210,6 +223,7 @@ class PipelineProcessor:
                 overlap_result=overlap_result,
                 silence_result=silence_result,
             )
+            logger.info(f"  [{filename}] Step 7 — Confidence: {time.perf_counter() - t0:.2f}s")
 
             # ── Assemble result ───────────────────────────────────────────────
             analysis = AudioAnalysis(
@@ -225,7 +239,7 @@ class PipelineProcessor:
             )
 
             processing_time = time.perf_counter() - start
-            logger.debug(f"Completed {filename} in {processing_time:.2f}s")
+            logger.info(f"Completed {filename} in {processing_time:.2f}s")
 
             return FileResult(
                 filename=filename,

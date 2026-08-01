@@ -149,9 +149,10 @@ class NoiseDetector:
         mfccs = librosa.feature.mfcc(y=noise_audio, sr=sr, n_mfcc=13)
         mfcc_var = float(np.mean(np.var(mfccs, axis=1)))
 
-        # Tempo and periodicity
+        # Tempo and periodicity — use at most 5s to avoid slow beat_track on CPU
         try:
-            tempo, _ = librosa.beat.beat_track(y=noise_audio, sr=sr)
+            beat_segment = noise_audio[:min(len(noise_audio), sr * 5)]
+            tempo, _ = librosa.beat.beat_track(y=beat_segment, sr=sr)
             has_rhythm = float(tempo) > 60 and float(tempo) < 200
         except Exception:
             has_rhythm = False

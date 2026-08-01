@@ -5,11 +5,12 @@
 
 import axios, { AxiosError } from "axios";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const rawApiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = rawApiBase.replace(/\/+$/, "");
 
 export const apiClient = axios.create({
   baseURL: `${API_BASE}/api/v1`,
-  timeout: 30_000,
+  timeout: 60_000,
   headers: {
     "Content-Type": "application/json",
   },

@@ -95,8 +95,8 @@ class Settings(BaseSettings):
     confidence_min_duration_seconds: float = Field(1.0, env="CONFIDENCE_MIN_DURATION_SECONDS")
 
     # ─────────────────────── Processing ──────────────────────────
-    max_concurrent_files: int = Field(4, env="MAX_CONCURRENT_FILES")
-    processing_timeout_seconds: int = Field(300, env="PROCESSING_TIMEOUT_SECONDS")
+    max_concurrent_files: int = Field(1, env="MAX_CONCURRENT_FILES")
+    processing_timeout_seconds: int = Field(120, env="PROCESSING_TIMEOUT_SECONDS")
 
     # ─────────────────────── HuggingFace ─────────────────────────
     huggingface_token: str = Field("", env="HUGGINGFACE_TOKEN")

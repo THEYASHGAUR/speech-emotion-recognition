@@ -15,9 +15,15 @@ import {
   FolderOpen,
   Zap,
   Info,
+  RefreshCw,
+  Clock,
+  XCircle,
 } from "lucide-react";
 
 const ALLOWED_EXTENSIONS = [".wav", ".mp3", ".ogg", ".flac", ".m4a", ".aac", ".webm", ".opus", ".zip"];
+const POLL_INTERVAL_MS = 5_000;          // 5 seconds between polls
+const MAX_POLL_DURATION_MS = 5 * 60_000; // 5 minutes max polling
+const MAX_CONSECUTIVE_ERRORS = 5;
 
 export default function UploadPage() {
   const router = useRouter();
@@ -31,7 +37,12 @@ export default function UploadPage() {
   // Batch progress polling
   const [batchId, setBatchId] = useState<string | null>(null);
   const [batchData, setBatchData] = useState<BatchResponse | null>(null);
+  const [pollingTimedOut, setPollingTimedOut] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const elapsedRef = useRef<NodeJS.Timeout | null>(null);
+  const pollStartRef = useRef<number>(0);
+  const consecutiveErrorsRef = useRef<number>(0);
 
   useEffect(() => {
     const token = localStorage.getItem("autoace_token");
@@ -41,18 +52,54 @@ export default function UploadPage() {
   // Poll for batch status
   useEffect(() => {
     if (!batchId) return;
-    pollRef.current = setInterval(async () => {
+
+    pollStartRef.current = Date.now();
+    consecutiveErrorsRef.current = 0;
+    setPollingTimedOut(false);
+    setElapsedSeconds(0);
+
+    // Elapsed timer (ticks every second)
+    elapsedRef.current = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - pollStartRef.current) / 1000));
+    }, 1000);
+
+    // Status polling
+    const poll = async () => {
+      // Check max polling duration
+      if (Date.now() - pollStartRef.current > MAX_POLL_DURATION_MS) {
+        clearInterval(pollRef.current!);
+        clearInterval(elapsedRef.current!);
+        setPollingTimedOut(true);
+        return;
+      }
+
       try {
         const data = await getBatch(batchId);
         setBatchData(data);
+        consecutiveErrorsRef.current = 0;
+
         if (data.status === "completed" || data.status === "failed" || data.status === "partial") {
           clearInterval(pollRef.current!);
+          clearInterval(elapsedRef.current!);
         }
       } catch {
-        clearInterval(pollRef.current!);
+        consecutiveErrorsRef.current += 1;
+        if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+          clearInterval(pollRef.current!);
+          clearInterval(elapsedRef.current!);
+          setPollingTimedOut(true);
+        }
       }
-    }, 2000);
-    return () => clearInterval(pollRef.current!);
+    };
+
+    // First poll immediately
+    poll();
+    pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(pollRef.current!);
+      clearInterval(elapsedRef.current!);
+    };
   }, [batchId]);
 
   function validateFiles(incoming: File[]): { valid: File[]; errors: string[] } {
@@ -92,6 +139,16 @@ export default function UploadPage() {
     addFiles(Array.from(e.dataTransfer.files));
   }, []);
 
+  function resetBatch() {
+    setBatchId(null);
+    setBatchData(null);
+    setPollingTimedOut(false);
+    setElapsedSeconds(0);
+    setError("");
+    setValidationWarnings([]);
+    consecutiveErrorsRef.current = 0;
+  }
+
   async function handleSubmit() {
     if (files.length === 0) return;
     setUploading(true);
@@ -116,12 +173,24 @@ export default function UploadPage() {
     }
   }
 
+  function formatElapsed(s: number): string {
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}m ${sec}s`;
+  }
+
   const progress = batchData
     ? Math.round(((batchData.completed_files + batchData.failed_files) / Math.max(batchData.total_files, 1)) * 100)
     : 0;
 
-  // If batch is complete, offer navigation
   const isComplete = batchData?.status === "completed" || batchData?.status === "partial";
+  const isFailed = batchData?.status === "failed";
+  const isTerminal = isComplete || isFailed;
+  const isProcessing = batchId && !isTerminal && !pollingTimedOut;
+
+  // Collect failed file error messages
+  const failedFiles = batchData?.results?.filter((r) => r.status === "failed") || [];
 
   return (
     <div className="gradient-bg" style={{ minHeight: "100vh" }}>
@@ -298,7 +367,7 @@ export default function UploadPage() {
           )}
 
           {/* Batch progress */}
-          {batchId && batchData && (
+          {batchId && (batchData || pollingTimedOut) && (
             <div className="glass-card animate-fade-in" style={{ padding: "28px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
                 <div>
@@ -307,24 +376,127 @@ export default function UploadPage() {
                     {batchId}
                   </code>
                 </div>
-                <span className={`badge ${STATUS_COLORS[batchData.status]}`}>
-                  {STATUS_LABELS[batchData.status]}
-                </span>
+                {batchData && (
+                  <span className={`badge ${STATUS_COLORS[batchData.status]}`}>
+                    {STATUS_LABELS[batchData.status]}
+                  </span>
+                )}
+                {pollingTimedOut && !batchData && (
+                  <span className="badge bg-red-50 text-red-700 border-red-200">Timed Out</span>
+                )}
               </div>
+
+              {/* ── Polling Timeout Error ─────────────────────────────────── */}
+              {pollingTimedOut && !isTerminal && (
+                <div
+                  style={{
+                    padding: "16px",
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: "12px",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                    <Clock size={18} style={{ color: "#dc2626", flexShrink: 0, marginTop: "2px" }} />
+                    <div>
+                      <p style={{ fontWeight: "600", fontSize: "14px", color: "#991b1b", marginBottom: "4px" }}>
+                        Processing timed out
+                      </p>
+                      <p style={{ fontSize: "13px", color: "#b91c1c", lineHeight: "1.5" }}>
+                        The server did not respond within 5 minutes. This is likely due to the free-tier server being slow or overloaded.
+                        The processing may still be running in the background — try refreshing later, or retry the upload.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Batch Failed Error Banner ─────────────────────────────── */}
+              {isFailed && (
+                <div
+                  style={{
+                    padding: "16px",
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: "12px",
+                    marginBottom: "20px",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                    <XCircle size={18} style={{ color: "#dc2626", flexShrink: 0, marginTop: "2px" }} />
+                    <div>
+                      <p style={{ fontWeight: "600", fontSize: "14px", color: "#991b1b", marginBottom: "4px" }}>
+                        Processing failed
+                      </p>
+                      <p style={{ fontSize: "13px", color: "#b91c1c", lineHeight: "1.5" }}>
+                        {batchData && batchData.failed_files > 0
+                          ? `${batchData.failed_files} of ${batchData.total_files} file${batchData.total_files !== 1 ? "s" : ""} failed to process.`
+                          : "All files failed to process."}
+                        {" "}This may be caused by server timeouts on the free tier, unsupported audio formats, or corrupted files.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Individual file errors */}
+                  {failedFiles.length > 0 && (
+                    <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #fecaca" }}>
+                      <p style={{ fontSize: "12px", fontWeight: "600", color: "#991b1b", marginBottom: "8px" }}>
+                        Error details:
+                      </p>
+                      {failedFiles.map((f) => (
+                        <div
+                          key={f.filename}
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            alignItems: "flex-start",
+                            fontSize: "12px",
+                            color: "#b91c1c",
+                            marginBottom: "4px",
+                            lineHeight: "1.4",
+                          }}
+                        >
+                          <span style={{ fontWeight: "500", flexShrink: 0 }}>{f.filename}:</span>
+                          <span>{f.error_message || "Unknown error"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Progress bar */}
-              <div style={{ marginBottom: "24px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px" }}>
-                  <span>{batchData.completed_files + batchData.failed_files} / {batchData.total_files} files</span>
-                  <span>{progress}%</span>
+              {batchData && (
+                <div style={{ marginBottom: "24px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-muted)", marginBottom: "8px" }}>
+                    <span>{batchData.completed_files + batchData.failed_files} / {batchData.total_files} files</span>
+                    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                      {elapsedSeconds > 0 && (
+                        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                          <Clock size={12} />
+                          {formatElapsed(elapsedSeconds)}
+                        </span>
+                      )}
+                      <span>{progress}%</span>
+                    </div>
+                  </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-bar-fill"
+                      style={{
+                        width: `${progress}%`,
+                        background: isFailed
+                          ? "linear-gradient(90deg, #ef4444, #dc2626)"
+                          : undefined,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="progress-bar">
-                  <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
-                </div>
-              </div>
+              )}
 
               {/* File results */}
-              {batchData.results.length > 0 && (
+              {batchData && batchData.results.length > 0 && (
                 <div>
                   {batchData.results.slice(0, 8).map((result) => (
                     <div
@@ -341,7 +513,7 @@ export default function UploadPage() {
                       {result.status === "completed" ? (
                         <CheckCircle2 size={14} style={{ color: "var(--success)", flexShrink: 0 }} />
                       ) : result.status === "failed" ? (
-                        <AlertCircle size={14} style={{ color: "var(--danger)", flexShrink: 0 }} />
+                        <XCircle size={14} style={{ color: "var(--danger)", flexShrink: 0 }} />
                       ) : (
                         <div className="animate-spin" style={{ width: "14px", height: "14px", border: "2px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", flexShrink: 0 }} />
                       )}
@@ -353,8 +525,21 @@ export default function UploadPage() {
                           {result.analysis.emotional_tone} • {(result.analysis.confidence * 100).toFixed(0)}%
                         </span>
                       )}
-                      {result.error_message && (
-                        <span style={{ fontSize: "11px", color: "#dc2626", fontWeight: "500" }}>Error</span>
+                      {result.status === "failed" && result.error_message && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            color: "#dc2626",
+                            fontWeight: "500",
+                            maxWidth: "200px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={result.error_message}
+                        >
+                          {result.error_message}
+                        </span>
                       )}
                     </div>
                   ))}
@@ -375,7 +560,7 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {/* Actions */}
+              {/* Actions — Success */}
               {isComplete && (
                 <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
                   <button
@@ -387,16 +572,54 @@ export default function UploadPage() {
                   </button>
                   <button
                     className="btn-secondary"
-                    onClick={() => { setBatchId(null); setBatchData(null); }}
+                    onClick={resetBatch}
                   >
                     Upload Another
                   </button>
                 </div>
               )}
 
-              {!isComplete && (
-                <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "16px", textAlign: "center" }}>
-                  Processing... Polling every 2 seconds
+              {/* Actions — Failed or Timed Out */}
+              {(isFailed || pollingTimedOut) && !isComplete && (
+                <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
+                  <button
+                    className="btn-primary"
+                    onClick={resetBatch}
+                    style={{ flex: 1, justifyContent: "center", gap: "8px" }}
+                  >
+                    <RefreshCw size={16} />
+                    Retry Upload
+                  </button>
+                </div>
+              )}
+
+              {/* Still processing */}
+              {isProcessing && (
+                <div style={{ marginTop: "16px", textAlign: "center" }}>
+                  <p style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                    Processing... Polling every 5 seconds
+                  </p>
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", opacity: 0.7 }}>
+                    Free-tier servers may take 1–2 minutes per file
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Loading state before first poll response */}
+          {batchId && !batchData && !pollingTimedOut && (
+            <div className="glass-card animate-fade-in" style={{ padding: "28px", textAlign: "center" }}>
+              <div className="animate-spin" style={{ width: "24px", height: "24px", border: "3px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", margin: "0 auto 16px" }} />
+              <p style={{ fontSize: "14px", fontWeight: "500", color: "var(--text-primary)", marginBottom: "4px" }}>
+                Processing started
+              </p>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                Waiting for server response...
+              </p>
+              {elapsedSeconds > 0 && (
+                <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                  <Clock size={12} /> {formatElapsed(elapsedSeconds)}
                 </p>
               )}
             </div>

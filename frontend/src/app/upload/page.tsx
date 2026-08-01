@@ -55,6 +55,7 @@ export default function UploadPage() {
 
     pollStartRef.current = Date.now();
     consecutiveErrorsRef.current = 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPollingTimedOut(false);
     setElapsedSeconds(0);
 

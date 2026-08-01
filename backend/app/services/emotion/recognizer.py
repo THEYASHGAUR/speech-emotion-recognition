@@ -135,7 +135,8 @@ class EmotionRecognizer:
             if device == 0:
                 logger.info("GPU available — emotion model on CUDA")
             else:
-                logger.info("No GPU detected — emotion model on CPU")
+                torch.set_num_threads(2)
+                logger.info("No GPU detected — emotion model on CPU (threads=2)")
         except ImportError:
             pass
 
@@ -161,16 +162,22 @@ class EmotionRecognizer:
             return EmotionalTone.neutral, EmotionalIntensity.low, 0.3
 
         try:
-            # Cap waveform duration to max 15s for emotion model to avoid long inference on CPU
+            import torch
+
+            # Take up to 15 seconds of audio for maximum accuracy
             max_samples = sample_rate * 15
             if len(waveform) > max_samples:
-                waveform = waveform[:max_samples]
+                start_idx = max(0, (len(waveform) - max_samples) // 2)
+                waveform_slice = waveform[start_idx : start_idx + max_samples]
+            else:
+                waveform_slice = waveform
 
             # HuggingFace pipeline accepts raw numpy arrays with sampling_rate
-            results = self._pipeline(
-                {"raw": waveform, "sampling_rate": sample_rate},
-                top_k=None,
-            )
+            with torch.no_grad():
+                results = self._pipeline(
+                    {"raw": waveform_slice, "sampling_rate": sample_rate},
+                    top_k=None,
+                )
 
             if not results:
                 return EmotionalTone.neutral, EmotionalIntensity.low, 0.3

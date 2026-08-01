@@ -126,7 +126,7 @@ class AudioProcessor:
         return waveform / peak
 
     def resample(self, waveform: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
-        """Resample waveform to target sample rate using librosa's high-quality resampler."""
+        """Resample waveform to target sample rate."""
         if orig_sr == target_sr:
             return waveform
         return librosa.resample(waveform, orig_sr=orig_sr, target_sr=target_sr)
